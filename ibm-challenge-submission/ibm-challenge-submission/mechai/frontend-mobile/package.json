@@ -1,0 +1,30 @@
+{
+  "name": "mechai-mobile",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "expo": "~51.0.0",
+    "expo-av": "~14.0.0",
+    "expo-router": "~3.5.0",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.1",
+    "@supabase/supabase-js": "^2.43.4",
+    "react-native-url-polyfill": "^2.0.0",
+    "@react-native-async-storage/async-storage": "1.23.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.5",
+    "@types/react": "~18.2.79",
+    "typescript": "^5.4.5",
+    "eslint": "^8.57.0",
+    "eslint-config-expo": "^7.0.0"
+  }
+}
