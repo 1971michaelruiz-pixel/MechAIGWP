@@ -18,6 +18,11 @@
   - [3 · Install dependencies](#3--install-dependencies)
   - [4 · Run the services](#4--run-the-services)
 - [Environment Variables Reference](#environment-variables-reference)
+- [Production Deployment](#production-deployment)
+  - [Database migrations](#database-migrations)
+  - [Docker build](#docker-build)
+  - [Authentication](#authentication)
+  - [CORS & rate limiting](#cors--rate-limiting)
 - [API Overview](#api-overview)
 - [RepairDataProvider Interface](#repairdataprovider-interface)
 - [Dialect Learning System](#dialect-learning-system)
@@ -206,8 +211,72 @@ Interactive API docs are available at `http://localhost:8000/docs` in developmen
 | `SUPABASE_JWT_SECRET` | ✅ | Used server-side for JWT verification — **keep secret** |
 | `OPENAI_API_KEY` | ✅ | Powers Whisper STT and GPT-4o extraction / synthesis |
 | `WHISPER_MODEL` | ❌ | Whisper model name (default: `whisper-1`) |
+| `CORS_ORIGINS` | ❌ | Comma-separated allowed origins (default: `http://localhost:5173`) |
+| `RATE_LIMIT_PER_MINUTE` | ❌ | AI endpoint rate limit per IP/min (default: `30`) |
 | `APP_ENV` | ❌ | `development` or `production` (disables `/docs` in production) |
 | `LOG_LEVEL` | ❌ | Uvicorn log level (default: `info`) |
+
+---
+
+## Production Deployment
+
+### Database migrations
+
+Schema changes are managed by **Alembic** — `create_all` has been removed from the startup path so there is no silent schema drift in production.
+
+```bash
+# Apply all pending migrations (run this before starting the server)
+make migrate
+
+# Auto-generate a migration after changing an ORM model
+make migrate-auto MSG="add index on sessions.shop_id"
+
+# Roll back the last migration
+make migrate-down
+```
+
+Migration files live in [`backend/alembic/versions/`](backend/alembic/versions/).
+Commit them to source control like any other code change.
+
+### Docker build
+
+A multi-stage [`Dockerfile`](backend/Dockerfile) is included.  The final image is `python:3.11-slim`, runs as a non-root user, and automatically runs `alembic upgrade head` before starting Uvicorn.
+
+```bash
+# Build the image
+make docker-build
+
+# Run it (supply your production .env values)
+docker run --env-file backend/.env -p 8000:8000 mechai-backend:latest
+```
+
+To run the full stack (DB + backend) via Docker Compose, uncomment the `backend` service in [`docker-compose.yml`](docker-compose.yml).
+
+### Authentication
+
+Every API endpoint except `GET /health` requires a valid Supabase-issued **JWT** in the `Authorization: Bearer <token>` header.
+
+The token is verified server-side using `SUPABASE_JWT_SECRET` (HS256).  Claims expected:
+
+| Claim path | Type | Description |
+|---|---|---|
+| `sub` | string | Supabase user UUID |
+| `app_metadata.shop_id` | string | UUID of the shop the user belongs to |
+| `app_metadata.role` | string | `admin`, `mechanic`, or `writer` |
+
+Role enforcement:
+- `PATCH /api/dialect/terms/{id}/approve` and `DELETE /api/dialect/candidates/{id}` require **`admin`**.
+- All other protected routes accept any authenticated user.
+
+### CORS & rate limiting
+
+Set `CORS_ORIGINS` to a comma-separated list of your production domain(s):
+
+```
+CORS_ORIGINS=https://app.mechai.io,https://admin.mechai.io
+```
+
+`/api/transcribe` and `/api/diagnose` are rate-limited per IP to `RATE_LIMIT_PER_MINUTE` requests/minute (default `30`).  Tune this value to match your OpenAI quota.
 
 ---
 
